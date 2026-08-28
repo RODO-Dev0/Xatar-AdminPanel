@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Streamflix Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: 11 14 20; --surface: 20 24 33; --surface-hover: 28 33 44;
+    --ink: 245 243 238; --muted: 139 144 160; --marquee: 232 184 75; --velvet: 193 68 60; --border: 40 46 60; --green: 74 163 98;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: rgb(var(--bg)); color: rgb(var(--ink)); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+  .font-display { font-family: 'Fraunces', serif; }
+  a { color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea, select { font-family: inherit; font-size: 16px; } /* 16px avoids iOS zoom-on-focus */
+  .sprocket-rule { height: 5px; opacity: .5; background-image: repeating-linear-gradient(90deg, rgb(var(--border)) 0px, rgb(var(--border)) 4px, transparent 4px, transparent 16px); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+  header { position: sticky; top: 0; z-index: 40; background: rgb(var(--bg) / .95); backdrop-filter: blur(8px); border-bottom: 1px solid rgb(var(--border)); }
+  .nav-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; flex-wrap: wrap; }
+  .brand { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .brand svg { color: rgb(var(--marquee)); flex-shrink: 0; }
+  .tabs { display: flex; gap: 4px; overflow-x: auto; flex: 1 1 100%; order: 3; -webkit-overflow-scrolling: touch; }
+  @media (min-width: 860px) { .tabs { flex: 0 1 auto; order: 0; overflow-x: visible; } }
+  .tab-btn { background: transparent; border: 1px solid transparent; color: rgb(var(--muted)); padding: 7px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+  .tab-btn.active { background: rgb(var(--surface)); color: rgb(var(--ink)); border-color: rgb(var(--border)); }
+  .tab-btn:hover:not(.active) { color: rgb(var(--ink)); }
+  .spacer { flex: 1; }
+  .btn { border-radius: 7px; padding: 9px 14px; font-size: 13px; font-weight: 600; border: 1px solid rgb(var(--border)); background: transparent; color: rgb(var(--ink)); white-space: nowrap; }
+  .btn:hover { background: rgb(var(--surface-hover)); }
+  .btn-primary { background: rgb(var(--marquee)); color: #0B0E14; border-color: rgb(var(--marquee)); }
+  .btn-primary:hover { opacity: .9; }
+  .btn-danger { color: rgb(var(--velvet)); border-color: rgb(var(--velvet) / .4); }
+  .btn-danger:hover { background: rgb(var(--velvet) / .1); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-block { width: 100%; }
+  main { padding: 20px 0 60px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+  @media (min-width: 640px) { .stat-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; } }
+  .stat-card { border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); border-radius: 10px; padding: 14px; }
+  .stat-card .num { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; }
+  .stat-card .label { font-size: 11px; color: rgb(var(--muted)); margin-top: 2px; }
+  .insight-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+  @media (min-width: 780px) { .insight-grid { grid-template-columns: 1fr 1fr; } }
+  .insight-card { border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); border-radius: 10px; padding: 16px; }
+  .insight-card h3 { margin: 0 0 10px; font-size: 13px; color: rgb(var(--muted)); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .insight-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgb(var(--border) / .5); font-size: 13px; }
+  .insight-row:last-child { border-bottom: none; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .search-input { border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); border-radius: 7px; padding: 8px 12px; font-size: 13px; color: rgb(var(--ink)); flex: 1 1 180px; min-width: 0; }
+  select.filter-select { border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); border-radius: 7px; padding: 8px 10px; font-size: 13px; color: rgb(var(--ink)); }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid rgb(var(--border)); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+  th { text-align: left; color: rgb(var(--muted)); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid rgb(var(--border)); cursor: pointer; white-space: nowrap; user-select: none; }
+  th:hover { color: rgb(var(--ink)); }
+  td { padding: 10px 12px; border-bottom: 1px solid rgb(var(--border)); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgb(var(--surface-hover) / .5); }
+  .thumb-cell { width: 40px; height: 58px; border-radius: 4px; object-fit: cover; background: rgb(var(--surface)); display: block; }
+  .status-pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 600; text-transform: capitalize; white-space: nowrap; }
+  .status-published { background: rgb(var(--green) / .15); color: rgb(var(--green)); }
+  .status-draft { background: rgb(var(--muted) / .15); color: rgb(var(--muted)); }
+  .status-scheduled { background: rgb(var(--marquee) / .15); color: rgb(var(--marquee)); }
+  .status-archived { background: rgb(var(--velvet) / .15); color: rgb(var(--velvet)); }
+  .role-pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+  .role-admin { background: rgb(var(--marquee) / .15); color: rgb(var(--marquee)); }
+  .role-user { background: rgb(var(--muted) / .15); color: rgb(var(--muted)); }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pagination { display: flex; gap: 6px; justify-content: flex-end; margin-top: 14px; }
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: flex-start; justify-content: center; z-index: 100; overflow-y: auto; padding: 16px; }
+  .modal { background: rgb(var(--bg)); border: 1px solid rgb(var(--border)); border-radius: 12px; width: 100%; max-width: 640px; padding: 18px; }
+  @media (min-width: 640px) { .modal { padding: 24px; } }
+  .modal h2 { margin-top: 0; font-family: 'Fraunces', serif; font-size: 19px; }
+  .form-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 16px; }
+  @media (min-width: 560px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+  .form-grid .full { grid-column: 1 / -1; }
+  label.field-label { display: block; font-size: 12px; color: rgb(var(--muted)); margin-bottom: 5px; }
+  .text-input, textarea.text-input, select.text-input {
+    width: 100%; border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); border-radius: 7px; padding: 9px 11px; font-size: 14px; color: rgb(var(--ink));
+  }
+  textarea.text-input { resize: vertical; }
+  .dropzone { border: 2px dashed rgb(var(--border)); border-radius: 10px; padding: 16px; text-align: center; color: rgb(var(--muted)); font-size: 13px; position: relative; cursor: pointer; word-break: break-word; }
+  .dropzone.drag { border-color: rgb(var(--marquee)); background: rgb(var(--marquee) / .05); }
+  .dropzone img, .dropzone video { max-height: 110px; max-width: 100%; border-radius: 6px; margin-top: 8px; }
+  .progress-bar { height: 6px; background: rgb(var(--surface-hover)); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+  .progress-bar .fill { height: 100%; background: rgb(var(--marquee)); width: 0%; transition: width .2s; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid rgb(var(--border)); padding-top: 16px; }
+  .err-text { color: rgb(var(--velvet)); font-size: 12px; margin-top: 8px; }
+  .log-item { border-bottom: 1px solid rgb(var(--border)); padding: 10px 4px; font-size: 13px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .log-item .action { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgb(var(--marquee)); }
+  .empty { text-align: center; padding: 50px 20px; color: rgb(var(--muted)); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgb(var(--ink)); color: rgb(var(--bg)); padding: 10px 18px; border-radius: 999px; font-size: 13px; z-index: 200; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; text-align: center; }
+  .toast.show { opacity: 1; }
+  .center-screen { min-height: 80vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; text-align: center; padding: 20px; }
+  .auth-card { max-width: 320px; width: 100%; text-align: left; margin-top: 8px; }
+  .auth-switch { display: flex; border: 1px solid rgb(var(--border)); border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+  .auth-switch button { flex: 1; padding: 9px; background: transparent; border: none; color: rgb(var(--muted)); font-size: 13px; font-weight: 600; }
+  .auth-switch button.active { background: rgb(var(--surface)); color: rgb(var(--ink)); }
+  .review-card { border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+  .review-card .meta { font-size: 12px; color: rgb(var(--muted)); margin-bottom: 6px; }
+  .star-mini { color: rgb(var(--marquee)); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav-row">
+    <div class="brand font-display">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+      Streamflix Admin
+    </div>
+    <div class="tabs" id="tabs" style="display:none">
+      <button class="tab-btn active" data-tab="movies">Movies</button>
+      <button class="tab-btn" data-tab="categories">Categories</button>
+      <button class="tab-btn" data-tab="reviews">Reviews</button>
+      <button class="tab-btn" data-tab="users">Users</button>
+      <button class="tab-btn" data-tab="logs">Activity Log</button>
+    </div>
+    <div class="spacer"></div>
+    <div id="who" style="font-size:12px;color:rgb(var(--muted))"></div>
+  </div>
+  <div class="sprocket-rule"></div>
+</header>
+
+<main class="wrap" id="app"></main>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== CONFIG ===================== */
+const SUPABASE_URL = 'https://ythykwtokvfcpemvdyym.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0aHlrd3Rva3ZmY3BlbXZkeXltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3ODY2ODEsImV4cCI6MjEwMzM2MjY4MX0.zqr4-B4EVJmK5vS7-F9DCF8Q-gVrR7iIRQD8obHkTng';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { flowType: 'pkce' } });
+
+const PAGE_SIZE = 15;
+let currentUser = null, isAdmin = false;
+let state = { tab: 'movies', page: 1, sortBy: 'created_at', sortDir: 'desc', search: '', statusFilter: '', selected: new Set() };
+
+/* ===================== UTIL ===================== */
+function esc(str) { if (str == null) return ''; const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2800); }
+function slugify(s) { return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+function fmtDate(d) { return d ? new Date(d).toLocaleString() : ''; }
+async function logAction(action, targetTable, targetId, details = {}) {
+  await sb.from('admin_logs').insert({ admin_id: currentUser.id, action, target_table: targetTable, target_id: targetId, details });
+}
+
+/* ===================== AUTH GATE ===================== */
+async function boot() {
+  const { data: { user } } = await sb.auth.getUser();
+  currentUser = user;
+
+  if (!user) return renderAuthScreen();
+
+  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single();
+  isAdmin = profile?.role === 'admin';
+
+  if (!isAdmin) return renderNotAdminScreen();
+
+  document.getElementById('tabs').style.display = 'flex';
+  document.getElementById('who').innerHTML = `${esc(user.email)} &nbsp;·&nbsp; <a href="#" id="signout-link" style="text-decoration:underline">Sign out</a>`;
+  document.getElementById('signout-link').addEventListener('click', async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); });
+
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.tab = btn.dataset.tab; state.page = 1; state.selected.clear();
+    renderTab();
+  }));
+
+  renderTab();
+}
+
+/* ===================== AUTH SCREEN: sign in / sign up ===================== */
+function renderAuthScreen() {
+  document.getElementById('tabs').style.display = 'none';
+  document.getElementById('who').innerHTML = '';
+  let mode = 'signin';
+
+  function draw() {
+    document.getElementById('app').innerHTML = `
+    <div class="center-screen">
+      <h1 class="font-display" style="font-size:22px">Admin access</h1>
+      <div class="auth-card">
+        <div class="auth-switch">
+          <button id="mode-signin" class="${mode === 'signin' ? 'active' : ''}">Sign in</button>
+          <button id="mode-signup" class="${mode === 'signup' ? 'active' : ''}">Sign up</button>
+        </div>
+        <label class="field-label">Email</label>
+        <input type="email" id="auth-email" class="text-input" placeholder="you@example.com">
+        <div style="margin-top:10px">
+          <label class="field-label">Password</label>
+          <input type="password" id="auth-password" class="text-input" placeholder="••••••••" minlength="6">
+        </div>
+        <button class="btn btn-primary btn-block" id="auth-submit" style="margin-top:14px">${mode === 'signin' ? 'Sign in' : 'Create account'}</button>
+        <p id="auth-msg" style="font-size:12px;color:rgb(var(--muted));margin-top:10px"></p>
+        ${mode === 'signup' ? `<p style="font-size:11px;color:rgb(var(--muted));margin-top:4px">New accounts start as regular users — an existing admin has to grant you access from the Users tab (or ask RODO_Dev/Xatar to do it directly in the database for the very first admin).</p>` : ''}
+      </div>
+    </div>`;
+
+    document.getElementById('mode-signin').onclick = () => { mode = 'signin'; draw(); };
+    document.getElementById('mode-signup').onclick = () => { mode = 'signup'; draw(); };
+
+    document.getElementById('auth-submit').onclick = async () => {
+      const email = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const msgEl = document.getElementById('auth-msg');
+      if (!email || !password) { msgEl.textContent = 'Enter an email and password.'; return; }
+      const btn = document.getElementById('auth-submit');
+      btn.disabled = true;
+
+      if (mode === 'signin') {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) { msgEl.textContent = error.message; btn.disabled = false; return; }
+        boot();
+      } else {
+        const { error } = await sb.auth.signUp({
+          email, password,
+          options: { emailRedirectTo: window.location.href.split('#')[0].split('?')[0] }
+        });
+        btn.disabled = false;
+        if (error) { msgEl.textContent = error.message; return; }
+        msgEl.textContent = 'Account created. If email confirmation is on for this project, check your inbox before signing in.';
+      }
+    };
+  }
+  draw();
+}
+
+function renderNotAdminScreen() {
+  document.getElementById('tabs').style.display = 'none';
+  document.getElementById('who').innerHTML = `${esc(currentUser.email)}`;
+  document.getElementById('app').innerHTML = `
+  <div class="center-screen">
+    <h1 class="font-display" style="font-size:22px">Not an admin</h1>
+    <p style="color:rgb(var(--muted));font-size:13px;max-width:340px">Your account (${esc(currentUser.email)}) is signed in but doesn't have the admin role yet. An existing admin can grant it from the Users tab.</p>
+    <button class="btn" id="signout-btn2">Sign out</button>
+  </div>`;
+  document.getElementById('signout-btn2').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+/* ===================== TAB ROUTER ===================== */
+function renderTab() {
+  if (state.tab === 'movies') return renderMoviesTab();
+  if (state.tab === 'categories') return renderCategoriesTab();
+  if (state.tab === 'reviews') return renderReviewsTab();
+  if (state.tab === 'users') return renderUsersTab();
+  if (state.tab === 'logs') return renderLogsTab();
+}
+
+/* ===================== MOVIES TAB ===================== */
+async function renderMoviesTab() {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="empty">Loading…</div>`;
+
+  const [{ count: total }, { count: published }, { count: draft }, { data: sumRows }, { data: mostWatched }, { data: topRated }] = await Promise.all([
+    sb.from('movies').select('*', { count: 'exact', head: true }),
+    sb.from('movies').select('*', { count: 'exact', head: true }).eq('status', 'published'),
+    sb.from('movies').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
+    sb.from('movies').select('view_count'),
+    sb.from('movies').select('title, view_count').order('view_count', { ascending: false }).limit(5),
+    sb.from('movies').select('title, avg_rating, rating_count').gt('rating_count', 0).order('avg_rating', { ascending: false }).limit(5),
+  ]);
+  const totalViews = (sumRows || []).reduce((a, r) => a + (r.view_count || 0), 0);
+
+  let query = sb.from('movies').select('*', { count: 'exact' });
+  if (state.search) query = query.ilike('title', `%${state.search}%`);
+  if (state.statusFilter) query = query.eq('status', state.statusFilter);
+  query = query.order(state.sortBy, { ascending: state.sortDir === 'asc' });
+  const from = (state.page - 1) * PAGE_SIZE, to = from + PAGE_SIZE - 1;
+  const { data: movies, count } = await query.range(from, to);
+
+  const { data: categories } = await sb.from('categories').select('*').order('sort_order');
+  window.__categories = categories || [];
+
+  app.innerHTML = `
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">${total ?? 0}</div><div class="label">Total titles</div></div>
+    <div class="stat-card"><div class="num">${published ?? 0}</div><div class="label">Published</div></div>
+    <div class="stat-card"><div class="num">${draft ?? 0}</div><div class="label">Drafts</div></div>
+    <div class="stat-card"><div class="num">${totalViews.toLocaleString()}</div><div class="label">Total views</div></div>
+  </div>
+
+  <div class="insight-grid">
+    <div class="insight-card">
+      <h3>Most Watched</h3>
+      ${(mostWatched || []).length ? mostWatched.map(m => `<div class="insight-row"><span>${esc(m.title)}</span><span style="color:rgb(var(--muted))">${(m.view_count||0).toLocaleString()} views</span></div>`).join('') : `<p style="color:rgb(var(--muted));font-size:13px">No views yet.</p>`}
+    </div>
+    <div class="insight-card">
+      <h3>Top Rated</h3>
+      ${(topRated || []).length ? topRated.map(m => `<div class="insight-row"><span>${esc(m.title)}</span><span class="star-mini">★ ${Number(m.avg_rating).toFixed(1)} (${m.rating_count})</span></div>`).join('') : `<p style="color:rgb(var(--muted));font-size:13px">No ratings yet.</p>`}
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" class="search-input" id="movie-search" placeholder="Search titles…" value="${esc(state.search)}">
+    <select class="filter-select" id="status-filter">
+      <option value="">All statuses</option>
+      <option value="draft">Draft</option>
+      <option value="scheduled">Scheduled</option>
+      <option value="published">Published</option>
+      <option value="archived">Archived</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="btn btn-sm btn-danger" id="bulk-delete" style="display:none">Delete selected</button>
+    <button class="btn btn-sm" id="bulk-archive" style="display:none">Archive selected</button>
+    <button class="btn btn-sm" id="bulk-publish" style="display:none">Publish selected</button>
+    <button class="btn btn-primary" id="add-movie-btn">+ Add Movie</button>
+  </div>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr>
+      <th style="width:30px"><input type="checkbox" id="select-all"></th>
+      <th style="width:50px"></th>
+      <th data-sort="title">Title</th>
+      <th data-sort="status">Status</th>
+      <th data-sort="view_count">Views</th>
+      <th data-sort="avg_rating">Rating</th>
+      <th data-sort="scheduled_publish_at">Scheduled</th>
+      <th data-sort="created_at">Created</th>
+      <th>Transcode</th>
+      <th></th>
+    </tr></thead>
+    <tbody id="movies-tbody">
+      ${(movies || []).map(rowHtml).join('') || `<tr><td colspan="10" class="empty">No titles found.</td></tr>`}
+    </tbody>
+  </table>
+  </div>
+
+  <div class="pagination" id="pagination"></div>
+  `;
+
+  function rowHtml(m) {
+    return `
+    <tr data-id="${m.id}">
+      <td><input type="checkbox" class="row-check" value="${m.id}" ${state.selected.has(m.id) ? 'checked' : ''}></td>
+      <td>${m.thumbnail_url ? `<img class="thumb-cell" src="${esc(m.thumbnail_url)}">` : `<div class="thumb-cell"></div>`}</td>
+      <td>${esc(m.title)}${m.featured ? ' ⭐' : ''}</td>
+      <td><span class="status-pill status-${m.status}">${esc(m.status)}</span></td>
+      <td>${(m.view_count || 0).toLocaleString()}</td>
+      <td>${m.avg_rating > 0 ? Number(m.avg_rating).toFixed(1) : '—'}</td>
+      <td style="font-size:12px;color:rgb(var(--muted))">${m.scheduled_publish_at ? fmtDate(m.scheduled_publish_at) : '—'}</td>
+      <td style="font-size:12px;color:rgb(var(--muted))">${fmtDate(m.created_at)}</td>
+      <td style="font-size:12px">${m.transcode_status}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-sm edit-btn" data-id="${m.id}">Edit</button>
+          ${m.status !== 'published' ? `<button class="btn btn-sm publish-btn" data-id="${m.id}">Publish</button>` : `<button class="btn btn-sm unpublish-btn" data-id="${m.id}">Unpublish</button>`}
+          ${m.status !== 'archived' ? `<button class="btn btn-sm archive-btn" data-id="${m.id}">Archive</button>` : ''}
+          <button class="btn btn-sm btn-danger del-btn" data-id="${m.id}">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }
+
+  const pageCount = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE));
+  const pagDiv = document.getElementById('pagination');
+  pagDiv.innerHTML = `
+    <button class="btn btn-sm" id="prev-page" ${state.page <= 1 ? 'disabled' : ''}>Prev</button>
+    <span style="font-size:12px;color:rgb(var(--muted));align-self:center;padding:0 8px">Page ${state.page} of ${pageCount}</span>
+    <button class="btn btn-sm" id="next-page" ${state.page >= pageCount ? 'disabled' : ''}>Next</button>`;
+  document.getElementById('prev-page').onclick = () => { state.page--; renderMoviesTab(); };
+  document.getElementById('next-page').onclick = () => { state.page++; renderMoviesTab(); };
+
+  document.getElementById('movie-search').oninput = debounce((e) => { state.search = e.target.value; state.page = 1; renderMoviesTab(); }, 400);
+  document.getElementById('status-filter').value = state.statusFilter;
+  document.getElementById('status-filter').onchange = (e) => { state.statusFilter = e.target.value; state.page = 1; renderMoviesTab(); };
+
+  document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
+    const col = th.dataset.sort;
+    if (state.sortBy === col) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    else { state.sortBy = col; state.sortDir = 'asc'; }
+    renderMoviesTab();
+  });
+
+  document.getElementById('select-all').onclick = (e) => {
+    document.querySelectorAll('.row-check').forEach(cb => { cb.checked = e.target.checked; toggleSelect(cb.value, e.target.checked); });
+    updateBulkBtns();
+  };
+  document.querySelectorAll('.row-check').forEach(cb => cb.onchange = () => { toggleSelect(cb.value, cb.checked); updateBulkBtns(); });
+  function toggleSelect(id, on) { on ? state.selected.add(id) : state.selected.delete(id); }
+  function updateBulkBtns() {
+    const has = state.selected.size > 0;
+    document.getElementById('bulk-delete').style.display = has ? 'inline-block' : 'none';
+    document.getElementById('bulk-archive').style.display = has ? 'inline-block' : 'none';
+    document.getElementById('bulk-publish').style.display = has ? 'inline-block' : 'none';
+  }
+  updateBulkBtns();
+
+  document.getElementById('bulk-publish').onclick = () => bulkUpdate({ status: 'published', published_at: new Date().toISOString() }, 'movie.bulk_publish');
+  document.getElementById('bulk-archive').onclick = () => bulkUpdate({ status: 'archived' }, 'movie.bulk_archive');
+  document.getElementById('bulk-delete').onclick = async () => {
+    if (!confirm(`Permanently delete ${state.selected.size} title(s)? This cannot be undone.`)) return;
+    const ids = [...state.selected];
+    await sb.from('movies').delete().in('id', ids);
+    await logAction('movie.bulk_delete', 'movies', null, { ids });
+    state.selected.clear();
+    toast('Deleted');
+    renderMoviesTab();
+  };
+  async function bulkUpdate(patch, action) {
+    const ids = [...state.selected];
+    await sb.from('movies').update(patch).in('id', ids);
+    await logAction(action, 'movies', null, { ids, patch });
+    state.selected.clear();
+    toast('Updated');
+    renderMoviesTab();
+  }
+
+  document.getElementById('add-movie-btn').onclick = () => openMovieModal(null);
+  document.querySelectorAll('.edit-btn').forEach(b => b.onclick = async () => {
+    const { data } = await sb.from('movies').select('*').eq('id', b.dataset.id).single();
+    openMovieModal(data);
+  });
+  document.querySelectorAll('.publish-btn').forEach(b => b.onclick = () => quickAction(b.dataset.id, { status: 'published', published_at: new Date().toISOString() }, 'movie.publish'));
+  document.querySelectorAll('.unpublish-btn').forEach(b => b.onclick = () => quickAction(b.dataset.id, { status: 'draft' }, 'movie.unpublish'));
+  document.querySelectorAll('.archive-btn').forEach(b => b.onclick = () => quickAction(b.dataset.id, { status: 'archived' }, 'movie.archive'));
+  document.querySelectorAll('.del-btn').forEach(b => b.onclick = async () => {
+    if (!confirm('Permanently delete this title? This cannot be undone.')) return;
+    await sb.from('movies').delete().eq('id', b.dataset.id);
+    await logAction('movie.delete', 'movies', b.dataset.id);
+    toast('Deleted');
+    renderMoviesTab();
+  });
+  async function quickAction(id, patch, action) {
+    await sb.from('movies').update(patch).eq('id', id);
+    await logAction(action, 'movies', id, patch);
+    renderMoviesTab();
+  }
+}
+
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+/* ===================== ADD/EDIT MODAL ===================== */
+let pendingThumbnailFile = null, pendingVideoFile = null, capturedDurationSeconds = null;
+
+function openMovieModal(movie) {
+  pendingThumbnailFile = null; pendingVideoFile = null; capturedDurationSeconds = movie?.duration_seconds || null;
+  const isEdit = !!movie;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+  <div class="modal">
+    <h2>${isEdit ? 'Edit Title' : 'Add New Title'}</h2>
+    <div class="form-grid">
+      <div class="full">
+        <label class="field-label">Thumbnail (JPG/PNG, max 5MB) — or auto-capture from video at 5s</label>
+        <div class="dropzone" id="thumb-drop">
+          ${movie?.thumbnail_url ? `<img src="${esc(movie.thumbnail_url)}">` : 'Drag & drop an image, or click to browse'}
+          <input type="file" id="thumb-input" accept="image/jpeg,image/png" style="display:none">
+        </div>
+      </div>
+      <div class="full">
+        <label class="field-label">Video file (MP4, max 2GB)</label>
+        <div class="dropzone" id="video-drop">
+          ${movie?.video_source_path ? `Existing video uploaded (${esc(movie.transcode_status)})` : 'Drag & drop an MP4, or click to browse'}
+          <input type="file" id="video-input" accept="video/mp4" style="display:none">
+        </div>
+        <div class="progress-bar" id="video-progress-wrap" style="display:none"><div class="fill" id="video-progress-fill"></div></div>
+        <p id="video-upload-msg" style="font-size:12px;color:rgb(var(--muted));margin-top:6px"></p>
+      </div>
+
+      <div class="full"><label class="field-label">Title *</label><input type="text" class="text-input" id="f-title" value="${esc(movie?.title || '')}"></div>
+      <div class="full"><label class="field-label">Description</label><textarea class="text-input" id="f-description" rows="3">${esc(movie?.description || '')}</textarea></div>
+
+      <div><label class="field-label">Category</label>
+        <select class="text-input" id="f-category">
+          <option value="">— None —</option>
+          ${window.__categories.map(c => `<option value="${c.id}" ${movie?.category_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="field-label">Content rating</label>
+        <select class="text-input" id="f-rating">
+          ${['G','PG','PG-13','R','NC-17','TV-MA'].map(r => `<option value="${r}" ${movie?.content_rating === r ? 'selected' : ''}>${r}</option>`).join('')}
+        </select>
+      </div>
+
+      <div><label class="field-label">Tags (comma separated)</label><input type="text" class="text-input" id="f-tags" value="${esc((movie?.tags || []).join(', '))}"></div>
+      <div><label class="field-label">Cast (comma separated)</label><input type="text" class="text-input" id="f-cast" value="${esc((movie?.cast_members || []).join(', '))}"></div>
+
+      <div><label class="field-label">Price (0 = free with subscription)</label><input type="number" step="0.01" class="text-input" id="f-price" value="${movie?.price ?? 0}"></div>
+      <div><label class="field-label">Release date</label><input type="date" class="text-input" id="f-release" value="${movie?.release_date || ''}"></div>
+
+      <div><label class="field-label">Duration</label><input type="text" class="text-input" id="f-duration" value="${capturedDurationSeconds ? Math.round(capturedDurationSeconds/60)+' min (auto)' : ''}" readonly></div>
+      <div class="checkbox-row" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="f-featured" ${movie?.featured ? 'checked' : ''}><label for="f-featured">Featured</label></div>
+
+      <div class="full">
+        <label class="field-label">Publishing</label>
+        <select class="text-input" id="f-publish-mode">
+          <option value="draft" ${movie?.status === 'draft' || !movie ? 'selected' : ''}>Save as draft</option>
+          <option value="now" ${movie?.status === 'published' ? 'selected' : ''}>Publish now</option>
+          <option value="schedule" ${movie?.status === 'scheduled' ? 'selected' : ''}>Schedule for later</option>
+        </select>
+      </div>
+      <div class="full" id="schedule-wrap" style="display:${movie?.status === 'scheduled' ? 'block' : 'none'}">
+        <label class="field-label">Scheduled publish time</label>
+        <input type="datetime-local" class="text-input" id="f-schedule-time" value="${movie?.scheduled_publish_at ? movie.scheduled_publish_at.slice(0,16) : ''}">
+      </div>
+    </div>
+    <p class="err-text" id="modal-err" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-save">${isEdit ? 'Save changes' : 'Create title'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('f-publish-mode').onchange = (e) => {
+    document.getElementById('schedule-wrap').style.display = e.target.value === 'schedule' ? 'block' : 'none';
+  };
+
+  function handleThumbnailFile(file) {
+    pendingThumbnailFile = file;
+    const url = URL.createObjectURL(file);
+    document.getElementById('thumb-drop').innerHTML = `<img src="${url}"><input type="file" id="thumb-input" accept="image/jpeg,image/png" style="display:none">`;
+    setupDropzone('thumb-drop', 'thumb-input', ['image/jpeg','image/png'], 5*1024*1024, handleThumbnailFile);
+  }
+  setupDropzone('thumb-drop', 'thumb-input', ['image/jpeg','image/png'], 5*1024*1024, handleThumbnailFile);
+
+  setupVideoDropzone();
+
+  document.getElementById('modal-cancel').onclick = () => overlay.remove();
+  document.getElementById('modal-save').onclick = () => saveMovie(movie, overlay);
+}
+
+function setupDropzone(dropId, inputId, acceptedTypes, maxSize, onFile) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  drop.onclick = () => input.click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('drag'); };
+  drop.ondragleave = () => drop.classList.remove('drag');
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); };
+  input.onchange = (e) => handleFile(e.target.files[0]);
+  function handleFile(file) {
+    if (!file) return;
+    if (!acceptedTypes.includes(file.type)) { toast('Unsupported file type: ' + (file.type || 'unknown')); return; }
+    if (file.size > maxSize) { toast(`File too large — max ${(maxSize/1024/1024).toFixed(0)}MB`); return; }
+    onFile(file);
+  }
+}
+
+function setupVideoDropzone() {
+  const drop = document.getElementById('video-drop');
+  const input = document.getElementById('video-input');
+  drop.onclick = () => input.click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('drag'); };
+  drop.ondragleave = () => drop.classList.remove('drag');
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); };
+  input.onchange = (e) => handleFile(e.target.files[0]);
+
+  function handleFile(file) {
+    if (!file) return;
+    // Some browsers/mobile file pickers report video/mp4 variants or an empty type for MP4 — check extension too.
+    const looksLikeMp4 = file.type === 'video/mp4' || /\.mp4$/i.test(file.name);
+    if (!looksLikeMp4) { toast('Only MP4 files are supported (got: ' + (file.type || 'unknown type') + ')'); return; }
+    if (file.size > 2 * 1024 * 1024 * 1024) { toast('File too large — max 2GB'); return; }
+    pendingVideoFile = file;
+    drop.innerHTML = `Selected: ${esc(file.name)} (${(file.size/1024/1024).toFixed(0)}MB)`;
+
+    const videoEl = document.createElement('video');
+    videoEl.preload = 'metadata';
+    videoEl.src = URL.createObjectURL(file);
+    videoEl.onloadedmetadata = () => {
+      capturedDurationSeconds = Math.round(videoEl.duration);
+      document.getElementById('f-duration').value = `${Math.round(capturedDurationSeconds/60)} min (auto)`;
+      videoEl.currentTime = Math.min(5, Math.max(0, videoEl.duration - 0.1));
+    };
+    videoEl.onseeked = () => {
+      if (pendingThumbnailFile) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = videoEl.videoWidth; canvas.height = videoEl.videoHeight;
+      canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        pendingThumbnailFile = new File([blob], 'auto-thumb.jpg', { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+        const thumbDrop = document.getElementById('thumb-drop');
+        if (thumbDrop) thumbDrop.innerHTML = `<img src="${url}"><input type="file" id="thumb-input" accept="image/jpeg,image/png" style="display:none">`;
+      }, 'image/jpeg', 0.85);
+    };
+    videoEl.onerror = () => toast('Could not read video metadata — the file may be corrupt.');
+  }
+}
+
+/* Upload with real progress via XHR (supabase-js doesn't expose upload progress) */
+function uploadWithProgress(bucket, path, file, onProgress) {
+  return new Promise(async (resolve, reject) => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { reject(new Error('Your session expired — please sign in again.')); return; }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`);
+    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+    xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.setRequestHeader('x-upsert', 'true');
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText || 'no response body — likely blocked by a storage policy or bucket limit'}`));
+    };
+    xhr.onerror = () => reject(new Error('Network error during upload — check your connection.'));
+    xhr.send(file);
+  });
+}
+
+async function saveMovie(existingMovie, overlay) {
+  const errEl = document.getElementById('modal-err');
+  errEl.style.display = 'none';
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { errEl.textContent = 'Title is required.'; errEl.style.display = 'block'; return; }
+
+  const saveBtn = document.getElementById('modal-save');
+  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+  const publishMode = document.getElementById('f-publish-mode').value;
+  const payload = {
+    title,
+    slug: existingMovie?.slug || (slugify(title) + '-' + Math.random().toString(36).slice(2, 7)),
+    description: document.getElementById('f-description').value.trim() || null,
+    category_id: document.getElementById('f-category').value || null,
+    content_rating: document.getElementById('f-rating').value,
+    tags: document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+    cast_members: document.getElementById('f-cast').value.split(',').map(t => t.trim()).filter(Boolean),
+    price: parseFloat(document.getElementById('f-price').value) || 0,
+    release_date: document.getElementById('f-release').value || null,
+    duration_seconds: capturedDurationSeconds || existingMovie?.duration_seconds || null,
+    featured: document.getElementById('f-featured').checked,
+    status: publishMode === 'now' ? 'published' : publishMode === 'schedule' ? 'scheduled' : 'draft',
+    scheduled_publish_at: publishMode === 'schedule' ? new Date(document.getElementById('f-schedule-time').value).toISOString() : null,
+    published_at: publishMode === 'now' ? new Date().toISOString() : (existingMovie?.published_at || null),
+  };
+  if (!existingMovie) payload.created_by = currentUser.id;
+
+  try {
+    let movieId = existingMovie?.id;
+    if (existingMovie) {
+      const { error } = await sb.from('movies').update(payload).eq('id', movieId);
+      if (error) throw error;
+      await logAction('movie.update', 'movies', movieId, { title });
+    } else {
+      const { data, error } = await sb.from('movies').insert(payload).select().single();
+      if (error) throw error;
+      movieId = data.id;
+      await logAction('movie.create', 'movies', movieId, { title });
+    }
+
+    if (pendingThumbnailFile) {
+      saveBtn.textContent = 'Uploading thumbnail…';
+      const ext = pendingThumbnailFile.type === 'image/png' ? 'png' : 'jpg';
+      const path = `${movieId}/thumb.${ext}`;
+      await uploadWithProgress('thumbnails', path, pendingThumbnailFile);
+      const { data: pub } = sb.storage.from('thumbnails').getPublicUrl(path);
+      await sb.from('movies').update({ thumbnail_url: pub.publicUrl }).eq('id', movieId);
+      await logAction('movie.thumbnail_upload', 'movies', movieId);
+    }
+
+    if (pendingVideoFile) {
+      document.getElementById('video-progress-wrap').style.display = 'block';
+      saveBtn.disabled = true;
+      const rawPath = `${movieId}/source.mp4`;
+      await uploadWithProgress('videos-raw', rawPath, pendingVideoFile, (frac) => {
+        document.getElementById('video-progress-fill').style.width = `${Math.round(frac*100)}%`;
+        document.getElementById('video-upload-msg').textContent = `Uploading… ${Math.round(frac*100)}%`;
+      });
+      await sb.from('movies').update({ video_source_path: rawPath, transcode_status: 'processing' }).eq('id', movieId);
+      await logAction('movie.video_upload', 'movies', movieId);
+      document.getElementById('video-upload-msg').textContent = 'Upload complete — processing…';
+
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/transcode-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ movieId, rawPath }),
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        document.getElementById('video-upload-msg').textContent = `Processing failed: ${errBody}`;
+      } else {
+        document.getElementById('video-upload-msg').textContent = 'Video ready.';
+      }
+    }
+
+    toast(existingMovie ? 'Title updated' : 'Title created');
+    overlay.remove();
+    renderMoviesTab();
+  } catch (err) {
+    errEl.textContent = err.message || String(err);
+    errEl.style.display = 'block';
+    saveBtn.disabled = false; saveBtn.textContent = existingMovie ? 'Save changes' : 'Create title';
+  }
+}
+
+/* ===================== CATEGORIES TAB ===================== */
+async function renderCategoriesTab() {
+  const app = document.getElementById('app');
+  const { data: categories } = await sb.from('categories').select('*').order('sort_order');
+  app.innerHTML = `
+  <div class="toolbar">
+    <input type="text" class="text-input" id="new-cat-name" placeholder="New category name" style="max-width:240px">
+    <button class="btn btn-primary" id="add-cat-btn">+ Add Category</button>
+  </div>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Name</th><th>Slug</th><th>Sort order</th><th></th></tr></thead>
+    <tbody>
+      ${(categories || []).map(c => `
+        <tr data-id="${c.id}">
+          <td>${esc(c.name)}</td>
+          <td style="color:rgb(var(--muted))">${esc(c.slug)}</td>
+          <td>${c.sort_order}</td>
+          <td><button class="btn btn-sm btn-danger cat-del" data-id="${c.id}">Delete</button></td>
+        </tr>`).join('') || `<tr><td colspan="4" class="empty">No categories yet.</td></tr>`}
+    </tbody>
+  </table>
+  </div>`;
+
+  document.getElementById('add-cat-btn').onclick = async () => {
+    const name = document.getElementById('new-cat-name').value.trim();
+    if (!name) return;
+    const { error } = await sb.from('categories').insert({ name, slug: slugify(name), sort_order: (categories?.length || 0) });
+    if (error) { toast(error.message); return; }
+    await logAction('category.create', 'categories', null, { name });
+    renderCategoriesTab();
+  };
+  document.querySelectorAll('.cat-del').forEach(b => b.onclick = async () => {
+    if (!confirm('Delete this category? Titles in it will become uncategorized.')) return;
+    await sb.from('categories').delete().eq('id', b.dataset.id);
+    await logAction('category.delete', 'categories', b.dataset.id);
+    renderCategoriesTab();
+  });
+}
+
+/* ===================== REVIEWS TAB ===================== */
+async function renderReviewsTab() {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="empty">Loading…</div>`;
+  const { data: reviews } = await sb
+    .from('reviews')
+    .select('*, movies(title), profiles(display_name)')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  app.innerHTML = `
+    <h2 class="font-display" style="font-size:18px;margin-bottom:14px">All Reviews (${(reviews || []).length})</h2>
+    ${(reviews || []).length === 0 ? `<div class="empty">No reviews yet.</div>` : (reviews || []).map(r => `
+      <div class="review-card" data-id="${r.id}">
+        <div class="meta">
+          <strong style="color:rgb(var(--ink))">${esc(r.movies?.title || 'Unknown title')}</strong>
+          &nbsp;·&nbsp; ${esc(r.profiles?.display_name || 'Anonymous')}
+          &nbsp;·&nbsp; ${fmtDate(r.created_at)}
+        </div>
+        <div class="review-rating" style="margin-bottom:6px">
+          <span class="star-mini">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+        </div>
+        <p class="review-comment" style="font-size:13px;margin:0 0 8px">${esc(r.comment || '(no comment)')}</p>
+        <div class="row-actions">
+          <button class="btn btn-sm review-edit" data-id="${r.id}">Edit</button>
+          <button class="btn btn-sm btn-danger review-del" data-id="${r.id}">Delete</button>
+        </div>
+      </div>
+    `).join('')}
+  `;
+
+  document.querySelectorAll('.review-del').forEach(b => b.onclick = async () => {
+    if (!confirm('Delete this review permanently?')) return;
+    await sb.from('reviews').delete().eq('id', b.dataset.id);
+    await logAction('review.delete', 'reviews', b.dataset.id);
+    toast('Review deleted');
+    renderReviewsTab();
+  });
+
+  document.querySelectorAll('.review-edit').forEach(b => b.onclick = () => {
+    const card = document.querySelector(`.review-card[data-id="${b.dataset.id}"]`);
+    const currentComment = card.querySelector('.review-comment').textContent;
+    const currentRating = card.querySelectorAll('.star-mini')[0].textContent.split('★').length - 1;
+    card.querySelector('.review-rating').innerHTML = `
+      <select class="text-input" id="edit-rating-${b.dataset.id}" style="width:80px;display:inline-block">
+        ${[1,2,3,4,5].map(n => `<option value="${n}" ${n === currentRating ? 'selected' : ''}>${n} ★</option>`).join('')}
+      </select>`;
+    card.querySelector('.review-comment').outerHTML = `<textarea class="text-input" id="edit-comment-${b.dataset.id}" rows="2" style="margin-bottom:8px">${currentComment === '(no comment)' ? '' : esc(currentComment)}</textarea>`;
+    card.querySelector('.row-actions').innerHTML = `
+      <button class="btn btn-sm btn-primary review-save" data-id="${b.dataset.id}">Save</button>
+      <button class="btn btn-sm review-cancel" data-id="${b.dataset.id}">Cancel</button>`;
+    card.querySelector('.review-save').onclick = async () => {
+      const rating = parseInt(document.getElementById(`edit-rating-${b.dataset.id}`).value);
+      const comment = document.getElementById(`edit-comment-${b.dataset.id}`).value.trim() || null;
+      await sb.from('reviews').update({ rating, comment }).eq('id', b.dataset.id);
+      await logAction('review.edit', 'reviews', b.dataset.id, { rating });
+      toast('Review updated');
+      renderReviewsTab();
+    };
+    card.querySelector('.review-cancel').onclick = () => renderReviewsTab();
+  });
+}
+
+/* ===================== USERS TAB ===================== */
+async function renderUsersTab() {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="empty">Loading…</div>`;
+
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-list-users`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  if (!res.ok) {
+    app.innerHTML = `<div class="empty">Couldn't load users: ${esc(await res.text())}</div>`;
+    return;
+  }
+  const { users } = await res.json();
+
+  app.innerHTML = `
+  <h2 class="font-display" style="font-size:18px;margin-bottom:14px">Users (${users.length})</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Email</th><th>Role</th><th>Age verified</th><th>Subscription</th><th>Joined</th><th></th></tr></thead>
+    <tbody>
+      ${users.map(u => `
+        <tr data-id="${u.id}">
+          <td>${esc(u.email)}</td>
+          <td><span class="role-pill role-${u.role}">${esc(u.role)}</span></td>
+          <td>${u.age_verified ? 'Yes' : 'No'}</td>
+          <td>${u.subscription_status ? esc(u.subscription_status) + (u.subscription_plan ? ' · ' + esc(u.subscription_plan) : '') : '—'}</td>
+          <td style="font-size:12px;color:rgb(var(--muted))">${fmtDate(u.created_at)}</td>
+          <td>
+            ${u.id === currentUser.id
+              ? `<span style="font-size:12px;color:rgb(var(--muted))">(you)</span>`
+              : u.role === 'admin'
+                ? `<button class="btn btn-sm demote-btn" data-id="${u.id}">Remove admin</button>`
+                : `<button class="btn btn-sm btn-primary promote-btn" data-id="${u.id}">Make admin</button>`}
+          </td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+  </div>`;
+
+  document.querySelectorAll('.promote-btn').forEach(b => b.onclick = async () => {
+    if (!confirm('Grant admin access to this user?')) return;
+    await sb.from('profiles').update({ role: 'admin' }).eq('id', b.dataset.id);
+    await logAction('user.promote', 'profiles', b.dataset.id);
+    toast('User promoted to admin');
+    renderUsersTab();
+  });
+  document.querySelectorAll('.demote-btn').forEach(b => b.onclick = async () => {
+    if (!confirm('Remove admin access from this user?')) return;
+    await sb.from('profiles').update({ role: 'user' }).eq('id', b.dataset.id);
+    await logAction('user.demote', 'profiles', b.dataset.id);
+    toast('Admin access removed');
+    renderUsersTab();
+  });
+}
+
+/* ===================== ACTIVITY LOG TAB ===================== */
+async function renderLogsTab() {
+  const app = document.getElementById('app');
+  const { data: logs } = await sb.from('admin_logs').select('*, profiles(display_name)').order('created_at', { ascending: false }).limit(100);
+  app.innerHTML = `
+    <h2 class="font-display" style="font-size:18px">Recent activity</h2>
+    <div style="margin-top:12px">
+      ${(logs || []).map(l => `
+        <div class="log-item">
+          <div>
+            <span class="action">${esc(l.action)}</span>
+            <span style="color:rgb(var(--muted))"> by ${esc(l.profiles?.display_name || 'admin')}</span>
+            ${l.target_table ? `<span style="color:rgb(var(--muted))"> · ${esc(l.target_table)}</span>` : ''}
+          </div>
+          <div style="color:rgb(var(--muted));white-space:nowrap;font-size:12px">${fmtDate(l.created_at)}</div>
+        </div>`).join('') || `<div class="empty">No activity yet.</div>`}
+    </div>`;
+}
+
+/* ===================== INIT ===================== */
+sb.auth.onAuthStateChange(() => boot());
+boot();
+</script>
+</body>
+</html>
